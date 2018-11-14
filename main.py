@@ -26,6 +26,10 @@ parser.add_argument('--experiment', type=str, default='experiment', metavar='E',
                     help='folder where experiment outputs are located.')
 parser.add_argument('--pretrainedWeights',type=str,default='alexnet-owt-4df8aa71.pth',
                     help='folder where the pretrained Net weights are located.')
+parser.add_argument('--network',type=str,default='AlexNet',
+                    help="Choose the type of Network [AlexNet or ResNet18 ]")
+
+
 args = parser.parse_args()
 use_cuda = torch.cuda.is_available()
 torch.manual_seed(args.seed)
@@ -48,24 +52,48 @@ val_loader = torch.utils.data.DataLoader(
 
 # Neural network and optimizer
 # We define neural net in model.py so that it can be reused by the evaluate.py script
-from model import AlexNet
+if args.network == "AlexNet":
+    from model import AlexNet
+    
+    model = AlexNet()
+    checkpoint = torch.load(args.pretrainedWeights)
+    
+    model.load_state_dict(checkpoint)
+    #reset the last layer 
+    fc_numftr = (model.classifier)[-1].in_features
+    fc_layer = nn.Linear(fc_numftr, 20)
+    (model.classifier)[-1] = fc_layer
+    
+    #Freeze all but last fully connected layer
+    i = 0
+    for param in (model.parameters()):
+        if i < 10 :      #10 layers not to freeze 
+            
+            param.requires_grad = False
+            i+=1
+            
+elif args.network == "ResNet18":
+    from model import ResNet
+    from model import BasicBlock
 
-model = AlexNet()
-checkpoint = torch.load(args.pretrainedWeights)
+    model = ResNet(BasicBlock, [2, 2, 2, 2])
 
-model.load_state_dict(checkpoint)
-#reset the last layer 
-fc_numftr = (model.classifier)[-1].in_features
-fc_layer = nn.Linear(fc_numftr, 20)
-(model.classifier)[-1] = fc_layer
+    checkpoint = torch.load(args.pretrainedWeights)
+    model.load_state_dict(checkpoint)
+    
+    #change last layer 
+    #reset the last layer 
+    fc_numftr = model.fc.in_features
+    fc_layer = nn.Linear(fc_numftr, 20)  #num_classes = 20
+    model.fc = fc_layer
+    #Freeze all but last fully connected layer
+    i = 0
+    for param in (model.parameters()):
+        if i < 61 :      #total of 62 layers --> leave the fully connected layer (softmax classifier)to learn 
+            
+            param.requires_grad = False
+            i+=1   
 
-#Freeze all but last fully connected layer
-i = 0
-for param in (model.parameters()):
-    if i < 10 :      #10 layers not to freeze 
-        
-        param.requires_grad = False
-        i+=1
 
 print(model.modules)
 if use_cuda:

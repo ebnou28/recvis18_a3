@@ -5,7 +5,6 @@ import PIL.Image as Image
 
 import torch
 
-from model import AlexNet
 
 parser = argparse.ArgumentParser(description='RecVis A3 evaluation script')
 parser.add_argument('--data', type=str, default='bird_dataset', metavar='D',
@@ -14,14 +13,29 @@ parser.add_argument('--model', type=str, metavar='M',
                     help="the model file to be evaluated. Usually it is of the form model_X.pth")
 parser.add_argument('--outfile', type=str, default='experiment/kaggle.csv', metavar='D',
                     help="name of the output csv file")
+parser.add_argument('--network',type=str,default='AlexNet',
+                    help="Choose the type of Network [AlexNet or ResNet18 ]")
+
 
 args = parser.parse_args()
 use_cuda = torch.cuda.is_available()
 
 state_dict = torch.load(args.model)
-model = AlexNet(num_classes=20)
-model.load_state_dict(state_dict)
-model.eval()
+
+if args.network == "AlexNet":
+    from model import AlexNet
+    
+    model = AlexNet(num_classes=20)
+    model.load_state_dict(state_dict)
+    model.eval()
+    
+elif args.network == "ResNet18":
+    from model import ResNet
+
+    model = ResNet(BasicBlock, [2, 2, 2, 2])
+    model.load_state_dict(state_dict)
+    model.eval()
+
 if use_cuda:
     print('Using GPU')
     model.cuda()
