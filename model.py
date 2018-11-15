@@ -177,6 +177,10 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        
+        
+        #### add two more FC-layers  #####
+        
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -219,3 +223,13 @@ class ResNet(nn.Module):
 
         return x
 
+
+
+#my custom net weight initialization ###
+weight_dict = net.state_dict()
+new_weight_dict = {}
+for param_key in state_dict:
+     # custom initialization in new_weight_dict,
+     # You can initialize partially i.e only some of the variables and let others stay as it is
+weight_dict.update(new_weight_dict)
+net.load_state_dict(new_weight_dict)
