@@ -31,8 +31,8 @@ if args.network == "AlexNet":
     
 elif args.network == "ResNet18":
     from model import ResNet
-
-    model = ResNet(BasicBlock, [2, 2, 2, 2])
+    from model import BasicBlock
+    model = ResNet(BasicBlock, [2, 2, 2, 2],num_classes = 20)
     model.load_state_dict(state_dict)
     model.eval()
 

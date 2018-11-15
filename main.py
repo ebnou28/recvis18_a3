@@ -89,7 +89,7 @@ elif args.network == "ResNet18":
     #Freeze all but last fully connected layer
     i = 0
     for param in (model.parameters()):
-        if i < 61 :      #total of 62 layers --> leave the fully connected layer (softmax classifier)to learn 
+        if i < 58 :      #total of 62 layers --> leave the fully connected layer (softmax classifier)to learn 
             
             param.requires_grad = False
             i+=1   
