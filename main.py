@@ -64,6 +64,7 @@ if args.network == "AlexNet":
     fc_layer = nn.Linear(fc_numftr, 20)
     (model.classifier)[-1] = fc_layer
     
+    
     #Freeze all but last fully connected layer
     i = 0
     for param in (model.parameters()):
@@ -76,25 +77,52 @@ elif args.network == "ResNet18":
     from model import ResNet
     from model import BasicBlock
 
-    model = ResNet(BasicBlock, [2, 2, 2, 2])
 
-    checkpoint = torch.load(args.pretrainedWeights)
-    model.load_state_dict(checkpoint)
+    model = ResNet(BasicBlock, [2, 2, 2, 2])
     
+    #fine tune the resnet on our classes
+    model.load_state_dict(torch.load(args.pretrainedWeights)) #initialize with the pretrainedweights
+    for param in model.parameters():
+           param.requires_grad = False
+
+    for param in model.parameters():
+           if param.requires_grad == True:
+               print("True")
+    num_ftrs = model.fc.in_features
+    model.fc = nn.Linear(num_ftrs, 50)
+    #add a final fully connected layer 
+    model = nn.Sequential(*[model,nn.ReLU(),nn.Linear(50,20)])
+    
+    #load the weights of the pretrained layers in their corresponding layers of the model
+    #model.load_state_dict(custom_weight_init(model,args.pretrainedWeights))
+    """
     #change last layer 
     #reset the last layer 
     fc_numftr = model.fc.in_features
     fc_layer = nn.Linear(fc_numftr, 20)  #num_classes = 20
     model.fc = fc_layer
-    #Freeze all but last fully connected layer
+    """
+    """
+    #freeze certain layers             
     i = 0
-    for param in (model.parameters()):
-        if i < 58 :      #total of 62 layers --> leave the fully connected layer (softmax classifier)to learn 
-            
-            param.requires_grad = False
-            i+=1   
-
-
+    for param in model.parameters():
+        if i < 58:
+           param.requires_grad = False
+           i+=1
+           print(i)
+    """       
+elif args.network == "cResNet18":  
+    from model import customResNet
+    from model import custom_weight_init
+    from model import BasicBlock
+    from model import freeze_layers
+    
+    model = customResNet(BasicBlock, [2, 2, 2, 2])
+    model.load_state_dict(custom_weight_init(model,args.pretrainedWeights))
+    #freeze all but two last 2 layers   
+    freeze_layers(model,2)
+    
+    
 print(model.modules)
 if use_cuda:
     print('Using GPU')
@@ -103,6 +131,7 @@ else:
     print('Using CPU')
 
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+
 
 def train(epoch):
     model.train()

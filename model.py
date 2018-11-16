@@ -224,12 +224,118 @@ class ResNet(nn.Module):
         return x
 
 
+class customResNet(nn.Module):
 
-#my custom net weight initialization ###
-weight_dict = net.state_dict()
-new_weight_dict = {}
-for param_key in state_dict:
-     # custom initialization in new_weight_dict,
-     # You can initialize partially i.e only some of the variables and let others stay as it is
-weight_dict.update(new_weight_dict)
-net.load_state_dict(new_weight_dict)
+    def __init__(self, block, layers, num_classes=20):
+        super(customResNet, self).__init__()
+        self.inplanes = 64
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        
+        
+        #### add two more FC-layers  #####
+        
+        self.fc1 = nn.Linear(50 * block.expansion, 128)
+        self.fc2 = nn.Linear(50, num_classes)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def _make_layer(self, block, planes, blocks, stride=1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                conv1x1(self.inplanes, planes * block.expansion, stride),
+                nn.BatchNorm2d(planes * block.expansion),
+            )
+
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample))
+        self.inplanes = planes * block.expansion
+        for _ in range(1, blocks):
+            layers.append(block(self.inplanes, planes))
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.relu(self.fc1(x))
+        x = self.fc2(x)
+
+        return x
+
+
+
+def custom_weight_init(model,pretrWeights,freeze=True):
+    """
+    Function that takes a network (model) and some weights of some of its layers (that we might
+    want to freeze during the training)
+    and returns a dict containing the weights for the layers initialized and a random 
+    initialization for the other layers
+    pretrWeights : path to the weights .pth
+    """
+    
+    #my custom net weight initialization ###
+    weight_dict = model.state_dict()
+    new_weight_dict = {}  #new dict with the custom weights for freezed and unfreezed layers
+    checkpoint = torch.load(pretrWeights) #dictionnary of pretrained weights 
+    for param_key in weight_dict.keys():
+         # custom initialization in new_weight_dict,
+         #initialize the resnet layers that we want to freeze by the pretrained weights
+         if param_key in checkpoint and param_key in weight_dict:
+             new_weight_dict[param_key] = checkpoint[param_key]  
+                 
+         #leave the new added layers to train 
+         else:
+             new_weight_dict[param_key] = weight_dict[param_key]
+
+    
+    return weight_dict
+
+def freeze_layers(model,m):
+    #m :  m last layers to keep trainable
+    
+    l = []
+    for param in model.parameters():
+        if param.requires_grad == True:
+            l.append(True)
+    n = len(l) 
+    
+    i = 0
+    
+    for param in model.parameters():
+        if i<len(l)-m:
+            param.requires_grad = False
+            i+=1
+    
+    
+        
+
+    
+#now load the weight custom initialisation to the model 
+#model.load_state_dict(custom_weight_init(model,'resnet18-5c106cde.pth'))
+
+    
