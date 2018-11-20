@@ -35,6 +35,27 @@ elif args.network == "ResNet18":
     model = ResNet(BasicBlock, [2, 2, 2, 2],num_classes = 20)
     model.load_state_dict(state_dict)
     model.eval()
+elif args.network == "ResNet152": 
+    from model import resnet152, Bottleneck, ResNet
+
+    model = ResNet(Bottleneck, [3, 8, 36, 3],num_classes=20)
+
+    model.load_state_dict(state_dict)
+    model.eval()
+    
+elif args.network == "Net": 
+    from model import Net
+    
+    model = Net()
+    model.load_state_dict(state_dict)
+    model.eval()
+    
+elif args.network == 'Net2':
+    from model import Net2
+    model = Net2()
+    model.load_state_dict(state_dict)
+    model.eval()
+
 
 if use_cuda:
     print('Using GPU')
@@ -42,7 +63,7 @@ if use_cuda:
 else:
     print('Using CPU')
 
-from data import data_transforms
+from data import data_transforms_val
 
 test_dir = args.data + '/test_images/mistery_category'
 
@@ -57,7 +78,7 @@ output_file = open(args.outfile, "w")
 output_file.write("Id,Category\n")
 for f in tqdm(os.listdir(test_dir)):
     if 'jpg' in f:
-        data = data_transforms(pil_loader(test_dir + '/' + f))
+        data = data_transforms_val(pil_loader(test_dir + '/' + f))
         data = data.view(1, data.size(0), data.size(1), data.size(2))
         if use_cuda:
             data = data.cuda()

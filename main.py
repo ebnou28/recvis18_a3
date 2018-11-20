@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets
 from torch.autograd import Variable
+import torchvision.models as models
+
 
 # Training settings
 parser = argparse.ArgumentParser(description='RecVis A3 training script')
@@ -39,7 +41,7 @@ if not os.path.isdir(args.experiment):
     os.makedirs(args.experiment)
 
 # Data initialization and loading
-from data import data_transforms
+from data import data_transforms , data_transforms_val 
 
 train_loader = torch.utils.data.DataLoader(
     datasets.ImageFolder(args.data + '/train_images',
@@ -47,12 +49,24 @@ train_loader = torch.utils.data.DataLoader(
     batch_size=args.batch_size, shuffle=True, num_workers=1)
 val_loader = torch.utils.data.DataLoader(
     datasets.ImageFolder(args.data + '/val_images',
-                         transform=data_transforms),
+                         transform=data_transforms_val),
     batch_size=args.batch_size, shuffle=False, num_workers=1)
 
 # Neural network and optimizer
 # We define neural net in model.py so that it can be reused by the evaluate.py script
-if args.network == "AlexNet":
+
+if args.network == 'Net':
+    from model import Net
+    
+    model = Net()
+    
+elif args.network == 'Net2':
+    from model import Net2
+    
+    model = Net2()
+    
+
+elif args.network == "AlexNet":
     from model import AlexNet
     
     model = AlexNet()
@@ -95,22 +109,7 @@ elif args.network == "ResNet18":
     
     #load the weights of the pretrained layers in their corresponding layers of the model
     #model.load_state_dict(custom_weight_init(model,args.pretrainedWeights))
-    """
-    #change last layer 
-    #reset the last layer 
-    fc_numftr = model.fc.in_features
-    fc_layer = nn.Linear(fc_numftr, 20)  #num_classes = 20
-    model.fc = fc_layer
-    """
-    """
-    #freeze certain layers             
-    i = 0
-    for param in model.parameters():
-        if i < 58:
-           param.requires_grad = False
-           i+=1
-           print(i)
-    """       
+   
 elif args.network == "cResNet18":  
     from model import customResNet
     from model import custom_weight_init
@@ -121,6 +120,10 @@ elif args.network == "cResNet18":
     model.load_state_dict(custom_weight_init(model,args.pretrainedWeights))
     #freeze all but two last 2 layers   
     freeze_layers(model,2)
+    
+elif args.network == "ResNet152":
+    from model import resnet152, BasicBlock, ResNet
+    model = resnet152(args.pretrainedWeights,20)
     
     
 print(model.modules)
@@ -176,3 +179,40 @@ for epoch in range(1, args.epochs + 1):
     model_file = args.experiment + '/model_' + str(epoch) + '.pth'
     torch.save(model.state_dict(), model_file)
     print('\nSaved model to ' + model_file + '. You can run `python evaluate.py --model ' + model_file + '` to generate the Kaggle formatted csv file')
+
+
+
+
+"""
+################ two networks training #####################
+from model import AlexNet , resnet152, BasicBlock, ResNet 
+net = [AlexNet(),resnet152(args.pretrainedWeights,20)]
+
+#loss and optimizer 
+parameters = set([])
+for net_ in net:
+    parameters |= net_.parameters()
+    
+optimizer = optim.SGD(parameters, lr=args.lr, momentum=args.momentum)    
+
+
+########## training the networks ##############   
+def train(epoch):
+    for model in net:
+        model.train()
+    for batch_idx, (data, target) in enumerate(train_loader):
+        if use_cuda:
+            data, target = data.cuda(), target.cuda()
+        optimizer.zero_grad()
+        for model in net:
+            out
+        output = model(data)
+        criterion = torch.nn.CrossEntropyLoss(reduction='elementwise_mean')
+        loss = criterion(output, target)
+        loss.backward()
+        optimizer.step()
+        if batch_idx % args.log_interval == 0:
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                epoch, batch_idx * len(data), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.data.item()))
+"""

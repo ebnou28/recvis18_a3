@@ -4,34 +4,115 @@ import torch.nn.functional as F
 
 nclasses = 20 
 
+import torchvision.models as models
+from collections import OrderedDict
+
+
 class Net(nn.Module):
+    
+
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(3, 96, kernel_size=5)
-        self.conv2 = nn.Conv2d(96, 256, kernel_size=5)
-        self.conv3 = nn.Conv2d(256, 384, kernel_size=3)
-        self.conv4 = nn.Conv2d(384,384,kernel_size=3)
-        self.conv5 = nn.Conv2d(384,256,kernel_size=3)
-        self.fc1 = nn.Linear(1024, 200)
-        self.fc2 = nn.Linear(200, nclasses)
         
+        vgg = models.vgg16_bn(pretrained=True)
+        resnet18_ = models.resnet18(pretrained=True)
+    
+        liste_featresnet = ['conv1', 'bn1', 'relu', 'maxpool', 'layer1', 'layer2', 'layer3'] 
+        
+        features_resnet = OrderedDict((k , resnet18_._modules[k]) for k in liste_featresnet)
+        features_vgg = vgg._modules['features']
+            
+        self.features_resnet = nn.Sequential(features_resnet)
+        self.features_vgg = nn.Sequential(features_vgg)
+        
+        for par in self.features_vgg.parameters():
+            par.requires_grad = False 
+            
+        for par in self.features_resnet.parameters():
+            par.requires_grad = False 
+            
+        self.resnet_trainable = nn.Sequential(resnet18_._modules['layer4'], resnet18_._modules['avgpool'])
+            
+        self.fcres = nn.Sequential(nn.Linear(in_features=512, out_features=1024),nn.ReLU(True))
+        
+        self.fcvgg = nn.Sequential(nn.Linear(25088, 4096),nn.ReLU(True),nn.Dropout(),
+                                   nn.Linear(4096, 1024),nn.ReLU(True))
+
+        
+        self.classifier = nn.Sequential(nn.Linear(2*1024,512), nn.Linear(512,20))
         
         
 
     def forward(self, x):
 
-        x = F.relu(F.max_pool2d(self.conv1(x), kernel_size=3,stride=2))
-        x = F.relu(F.max_pool2d(self.conv2(x), kernel_size=3,stride=2))
-        x = F.relu(self.conv3(x))
-        x = F.relu(self.conv4(x))
-        x = F.relu(F.max_pool2d(self.conv5(x),kernel_size=3,stride=2))
+        x1 = self.features_resnet(x)
+        x1 = self.resnet_trainable(x1) 
+        x1 = x1.view(x1.size(0), -1)
+        x1 = self.fcres(x1)
         
-        x = x.view(-1,1024)
+        x2 = self.features_vgg(x)
+        x2 = x2.view(x2.size(0),-1)
+        x2 = self.fcvgg(x2)
+
+        output = torch.cat((x1,x2),-1)
         
-        x = F.relu(self.fc1(x))
+        output = self.classifier(output)
+
+        return output
+ 
+class Net2(nn.Module):
+    
+
+    def __init__(self):
+        super(Net2, self).__init__()
+        
+        vgg = models.vgg16_bn(pretrained=True)
+        resnet152_ = models.resnet152(pretrained=True)
+    
+        liste_featresnet =['conv1', 'bn1', 'relu', 'maxpool', 'layer1', 'layer2', 'layer3'] 
+        
+        features_resnet = OrderedDict((k , resnet152_._modules[k]) for k in liste_featresnet)
+        features_vgg = vgg._modules['features']
+            
+        self.features_resnet = nn.Sequential(features_resnet)
+        self.features_vgg = nn.Sequential(features_vgg)
+        
+        for par in self.features_vgg.parameters():
+            par.requires_grad = False 
+            
+        for par in self.features_resnet.parameters():
+            par.requires_grad = False 
+            
+        self.resnet_trainable = nn.Sequential(resnet152_._modules['layer4'], resnet152_._modules['avgpool'])
+            
+        self.fcres = nn.Sequential(nn.Linear(in_features=2048, out_features=1024),nn.ReLU(True))
+        
+        self.fcvgg = nn.Sequential(nn.Linear(25088, 4096),nn.ReLU(True),nn.Dropout(),
+                                   nn.Linear(4096, 1024),nn.ReLU(True))
 
         
-        return self.fc2(x)
+        self.classifier = nn.Sequential(nn.Linear(2*1024,512), nn.Linear(512,20))
+        
+        
+
+    def forward(self, x):
+
+        x1 = self.features_resnet(x)
+        x1 = self.resnet_trainable(x1) 
+        x1 = x1.view(x1.size(0), -1)
+        x1 = self.fcres(x1)
+        
+        x2 = self.features_vgg(x)
+        x2 = x2.view(x2.size(0),-1)
+        x2 = self.fcvgg(x2)
+
+        output = torch.cat((x1,x2),-1)
+        
+        output = self.classifier(output)
+
+        return output   
+    
+
 
 
 class AlexNet(nn.Module):
@@ -338,4 +419,20 @@ def freeze_layers(model,m):
 #now load the weight custom initialisation to the model 
 #model.load_state_dict(custom_weight_init(model,'resnet18-5c106cde.pth'))
 
+pretrWeights = 'resnet152-b121ed2d.pth'
+
+#resnet152
+def resnet152(pretrWeights,num_classes, pretrained=True):
+    """Constructs a ResNet-152 model.
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+    """
+    model = ResNet(Bottleneck, [3, 8, 36, 3])
+    if pretrained:
+        model.load_state_dict(torch.load(pretrWeights))
+    num_features = model.fc.in_features    
+    model.fc = nn.Linear(num_features,num_classes)
     
+    return model
+
+
